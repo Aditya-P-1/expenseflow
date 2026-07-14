@@ -23,8 +23,7 @@ import {
   API_URL,
   AUTH_EXPIRED_EVENT,
   AUTH_REFRESHED_EVENT,
-  notifyAuthExpired,
-  refreshSession,
+  ensureFreshSession,
 } from "@/lib/api";
 import { clearStoredAuth, readStoredAuth } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
@@ -139,19 +138,7 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
 
     stream.onerror = async () => {
       stream.close();
-
-      const storedAuth = readStoredAuth();
-
-      if (!storedAuth?.refreshToken) {
-        notifyAuthExpired();
-        return;
-      }
-
-      try {
-        await refreshSession(storedAuth.refreshToken);
-      } catch {
-        notifyAuthExpired();
-      }
+      await ensureFreshSession();
     };
 
     return () => stream.close();

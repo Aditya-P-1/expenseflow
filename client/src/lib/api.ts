@@ -13,6 +13,7 @@ export const api = axios.create({
 
 const AUTH_REFRESHED_EVENT = "expenseflow.auth.refreshed";
 const AUTH_EXPIRED_EVENT = "expenseflow.auth.expired";
+let refreshSessionPromise: Promise<AuthResponse> | null = null;
 
 export function notifyAuthExpired() {
   clearStoredAuth();
@@ -23,22 +24,50 @@ export function notifyAuthExpired() {
 }
 
 export async function refreshSession(refreshToken: string) {
-  const response = await axios.post<ApiResponse<AuthResponse>>(
-    `${API_URL}/api/auth/refresh`,
-    { refreshToken }
-  );
-
-  persistAuth(response.data.data);
-
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent<AuthResponse>(AUTH_REFRESHED_EVENT, {
-        detail: response.data.data,
+  if (!refreshSessionPromise) {
+    refreshSessionPromise = axios
+      .post<ApiResponse<AuthResponse>>(`${API_URL}/api/auth/refresh`, {
+        refreshToken,
       })
-    );
+      .then((response) => {
+        persistAuth(response.data.data);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent<AuthResponse>(AUTH_REFRESHED_EVENT, {
+              detail: response.data.data,
+            })
+          );
+        }
+
+        return response.data.data;
+      })
+      .finally(() => {
+        refreshSessionPromise = null;
+      });
   }
 
-  return response.data.data;
+  return refreshSessionPromise;
+}
+
+async function refreshStoredSession() {
+  const auth = readStoredAuth();
+
+  if (!auth?.refreshToken) {
+    notifyAuthExpired();
+    return null;
+  }
+
+  try {
+    return await refreshSession(auth.refreshToken);
+  } catch {
+    notifyAuthExpired();
+    return null;
+  }
+}
+
+export async function ensureFreshSession() {
+  return refreshStoredSession();
 }
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -57,24 +86,19 @@ api.interceptors.response.use(
     const originalRequest = error.config as
       | (InternalAxiosRequestConfig & { _retry?: boolean })
       | undefined;
-    const auth = readStoredAuth();
 
     if (
       error.response?.status === 401 &&
       originalRequest &&
-      !originalRequest._retry &&
-      auth?.refreshToken
+      !originalRequest._retry
     ) {
       originalRequest._retry = true;
 
-      try {
-        const refreshedAuth = await refreshSession(auth.refreshToken);
+      const refreshedAuth = await refreshStoredSession();
 
+      if (refreshedAuth) {
         originalRequest.headers.Authorization = `Bearer ${refreshedAuth.accessToken}`;
-
         return api(originalRequest);
-      } catch {
-        notifyAuthExpired();
       }
     }
 
