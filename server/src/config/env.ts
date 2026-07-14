@@ -19,4 +19,6 @@ export const env = {
 
   ACCESS_TOKEN_EXPIRES_IN: getEnv("ACCESS_TOKEN_EXPIRES_IN") as SignOptions["expiresIn"],
   REFRESH_TOKEN_EXPIRES_IN: getEnv("REFRESH_TOKEN_EXPIRES_IN") as SignOptions["expiresIn"],
+
+  CLIENT_URL: getEnv("CLIENT_URL"),
 };

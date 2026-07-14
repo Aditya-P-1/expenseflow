@@ -13,17 +13,17 @@ import claimRoutes from "./routes/claim.routes";
 import approvalRoutes from "./routes/approval.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import notificationRoutes from "./routes/notification.routes";
+import { env } from "./config/env";
 
 
 const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: env.CLIENT_URL,
     credentials: true,
   })
 );
-
 app.use(helmet());
 
 app.use("/api/notifications", notificationRoutes);
