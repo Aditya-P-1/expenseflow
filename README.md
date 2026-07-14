@@ -34,7 +34,7 @@ client/
 
 ### Frontend Features
 
-- Public landing page at `http://localhost:3000/`
+- Public landing page at `https://expenseflow-five-inky.vercel.app/`
 - Login and signup screens
 - Authenticated workspace shell
 - Automatic redirect from `/login` and `/signup` to `/dashboard` when already logged in
@@ -51,7 +51,7 @@ client/
 Create `client/.env.local` if the API is not running on the default port:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_API_URL=https://expenseflow-5hqe.onrender.com
 ```
 
 ### Frontend Setup
@@ -65,7 +65,7 @@ npm run dev
 Open:
 
 ```txt
-http://localhost:3000
+https://expenseflow-five-inky.vercel.app
 ```
 
 ### Frontend Scripts
@@ -152,7 +152,7 @@ npm run dev
 Health check:
 
 ```txt
-GET /health
+GET /
 ```
 
 ### Backend Scripts

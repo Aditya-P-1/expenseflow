@@ -40,7 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-app.get("/health", (_, res) => {
+app.get("/", (_, res) => {
   res.status(200).json({
     success: true,
     message: "ExpenseFlow API is running 🚀",
