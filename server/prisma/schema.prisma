@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String  @id @default(uuid())
+  name         String
+  email        String  @unique
+  password     String
+  refreshToken String? @db.Text
+
+  role          Role
+  isActive      Boolean         @default(true)
+  reportsToId   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  claims        Claim[]         @relation("EmployeeClaims")
+  pendingClaims Claim[]         @relation("PendingReviewer")
+  activities    ClaimActivity[]
+  reportsTo     User?           @relation("ReportingHierarchy", fields: [reportsToId], references: [id])
+  subordinates  User[]          @relation("ReportingHierarchy")
+
+  @@index([role])
+  @@index([reportsToId])
+}
+
+model Claim {
+  id            String          @id @default(uuid())
+  claimNumber   String          @unique
+  amount        Decimal         @db.Decimal(10, 2)
+  currency      String          @default("INR")
+  category      ExpenseCategory
+  description   String
+  expenseDate   DateTime
+  receiptUrl    String?
+  status        ClaimStatus     @default(DRAFT)
+  employeeId    String
+  pendingWithId String?
+  submittedAt   DateTime?
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  employee      User            @relation("EmployeeClaims", fields: [employeeId], references: [id], onDelete: Cascade)
+  pendingWith   User?           @relation("PendingReviewer", fields: [pendingWithId], references: [id])
+  activities    ClaimActivity[]
+
+  @@index([employeeId])
+  @@index([pendingWithId])
+  @@index([status])
+}
+
+model ClaimActivity {
+  id        String         @id @default(uuid())
+  claimId   String
+  actorId   String
+  action    ApprovalAction
+  note      String?
+  createdAt DateTime       @default(now())
+  actor     User           @relation(fields: [actorId], references: [id])
+  claim     Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([claimId])
+  @@index([actorId])
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  SENIOR_MANAGER
+  ADMIN
+}
+
+enum ClaimStatus {
+  DRAFT
+  PENDING_MANAGER
+  PENDING_SENIOR_MANAGER
+  REVERTED_TO_MANAGER
+  REVERTED_TO_EMPLOYEE
+  APPROVED
+  REJECTED
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  FOOD
+  ACCOMMODATION
+  FUEL
+  MEDICAL
+  OTHER
+}
+
+enum ApprovalAction {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REVERTED
+  UPDATED
+}
