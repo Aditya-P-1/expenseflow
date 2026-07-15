@@ -89,11 +89,9 @@ class ClaimService {
     const manager = payload.saveAsDraft
       ? null
       : await this.getEmployeeManager(user.id);
-    const claimNumber = await claimRepository.nextClaimNumber();
 
     return claimRepository.create(
       {
-        claimNumber,
         amount: new Prisma.Decimal(payload.amount),
         currency: payload.currency ?? "INR",
         category: payload.category,

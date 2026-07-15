@@ -9,6 +9,8 @@ import {
 
 import prisma from "../prisma/prisma";
 
+type ClaimCreateData = Omit<Prisma.ClaimCreateInput, "claimNumber">;
+
 class ClaimRepository {
   findById(id: string) {
     return prisma.claim.findUnique({
@@ -28,27 +30,69 @@ class ClaimRepository {
     });
   }
 
-  async create(data: Prisma.ClaimCreateInput, activity?: {
+  private async nextClaimNumber(
+    tx: Prisma.TransactionClient,
+    year = new Date().getFullYear()
+  ) {
+    const prefix = `CLM-${year}-`;
+    const latestClaim = await tx.claim.findFirst({
+      where: { claimNumber: { startsWith: prefix } },
+      orderBy: { claimNumber: "desc" },
+      select: { claimNumber: true },
+    });
+
+    const latestSequence = latestClaim
+      ? Number(latestClaim.claimNumber.replace(prefix, ""))
+      : 0;
+    const nextSequence = Number.isFinite(latestSequence)
+      ? latestSequence + 1
+      : 1;
+
+    return `${prefix}${String(nextSequence).padStart(5, "0")}`;
+  }
+
+  async create(data: ClaimCreateData, activity?: {
     actorId: string;
     action: ApprovalAction;
     note?: string;
   }) {
-    return prisma.$transaction(async (tx) => {
-      const claim = await tx.claim.create({ data });
+    const maxAttempts = 5;
 
-      if (activity) {
-        await tx.claimActivity.create({
-          data: {
-            claimId: claim.id,
-            actorId: activity.actorId,
-            action: activity.action,
-            note: activity.note,
-          },
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const claimNumber = await this.nextClaimNumber(tx);
+          const claim = await tx.claim.create({
+            data: { ...data, claimNumber },
+          });
+
+          if (activity) {
+            await tx.claimActivity.create({
+              data: {
+                claimId: claim.id,
+                actorId: activity.actorId,
+                action: activity.action,
+                note: activity.note,
+              },
+            });
+          }
+
+          return claim;
         });
-      }
+      } catch (error) {
+        const isClaimNumberCollision =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002" &&
+          Array.isArray(error.meta?.target) &&
+          error.meta.target.includes("claimNumber");
 
-      return claim;
-    });
+        if (!isClaimNumberCollision || attempt === maxAttempts) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error("Unable to allocate a claim number");
   }
 
   async updateWithActivity(
@@ -167,13 +211,6 @@ class ClaimRepository {
     });
   }
 
-  async nextClaimNumber() {
-    const count = await prisma.claim.count();
-    return `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(
-      5,
-      "0"
-    )}`;
-  }
 }
 
 export default new ClaimRepository();
